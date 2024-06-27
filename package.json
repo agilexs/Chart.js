@@ -63,7 +63,7 @@
     "yargs": "^12.0.5"
   },
   "dependencies": {
-    "chartjs-color": "^2.1.0",
+    "chartjs-color": "https://github.com/agilexs/chartjs-color#sensium-v2.8",
     "moment": "^2.10.2"
   }
 }

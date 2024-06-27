@@ -291,10 +291,23 @@ function getTooltipSize(tooltip, model) {
 
 	// Count of all lines in the body
 	var body = model.body;
-	var combinedBodyLength = body.reduce(function(count, bodyItem) {
-		return count + bodyItem.before.length + bodyItem.lines.length + bodyItem.after.length;
+	var combinedBodyLength = body.reduce(function (count, bodyItem) {
+	var bodyLength = 0;
+	var isEWS = false;
+	bodyItem.lines.forEach(element => {
+		if (element.indexOf('EWSSplit$#FFF') !== -1) {
+			isEWS = true;
+		}
+	});
+	if (isEWS === true) {
+		bodyLength = bodyItem.lines.length / 2;
+	} else {
+		bodyLength = bodyItem.lines.length;
+	}
+	return count + bodyItem.before.length + bodyLength + bodyItem.after.length;
 	}, 0);
 	combinedBodyLength += model.beforeBody.length + model.afterBody.length;
+
 
 	var titleLineCount = model.title.length;
 	var footerLineCount = model.footer.length;
@@ -344,7 +357,7 @@ function getTooltipSize(tooltip, model) {
 
 	return {
 		width: width,
-		height: height
+		height: height + 30
 	};
 }
 
@@ -536,7 +549,10 @@ var exports = Element.extend({
 			pushOrConcat(bodyItem.lines, callbacks.label.call(me, tooltipItem, data));
 			pushOrConcat(bodyItem.after, splitNewlines(callbacks.afterLabel.call(me, tooltipItem, data)));
 
-			bodyItems.push(bodyItem);
+			if (bodyItems.length == 0) {
+				bodyItems.push(bodyItem);
+			}
+
 		});
 
 		return bodyItems;
@@ -760,20 +776,82 @@ var exports = Element.extend({
 
 			ctx.fillStyle = vm.titleFontColor;
 			ctx.font = helpers.fontString(titleFontSize, vm._titleFontStyle, vm._titleFontFamily);
+			ctx.font = '12px Arial';
 
 			var i, len;
 			for (i = 0, len = title.length; i < len; ++i) {
-				ctx.fillText(title[i], pt.x, pt.y);
-				pt.y += titleFontSize + titleSpacing; // Line Height and spacing
+				if (title[i].indexOf('Split$#FFFActivity:') > -1) {
+					var arr = title[i].split('Split$#FFFActivity:');
+					ctx.fillText(arr[0], pt.x, pt.y + 10); //pfan
 
-				if (i + 1 === title.length) {
-					pt.y += vm.titleMarginBottom - titleSpacing; // If Last, add margin, remove spacing
+					var activityArr = arr[1].split(':');
+					var code = activityArr[0];
+					var name = activityArr[1];
+					var img = new Image();
+					img.onload = function () {
+						ctx.font = '12px Arial';
+						ctx.fillStyle = 'white';
+						if (code === '1') {
+							ctx.drawImage(img, pt.x + 50, pt.y - 195); //lightActivity;
+							ctx.fillText(name, pt.x + 220, pt.y - 170);
+						} else if (code === '2') {
+							ctx.drawImage(img, pt.x + 50, pt.y - 192); //moderateActivity;
+							ctx.fillText(name, pt.x + 220, pt.y - 170);
+						} else if (code === '3' || code === '4' || code === '5') {
+							ctx.drawImage(img, pt.x + 50, pt.y - 200); // lyingFaceUp; standing; lyingFaceDown
+							ctx.fillText(name, pt.x + 220, pt.y - 170);
+						} else if (code === '6') {
+							ctx.drawImage(img, pt.x + 50, pt.y - 195); //seated;
+							ctx.fillText(name, pt.x + 220, pt.y - 170);
+						} else {
+							ctx.drawImage(img, pt.x + 50, pt.y - 200); //lyingLeftSide; lyingRightSide; lying60Deg
+							ctx.fillText(name, pt.x + 220, pt.y - 170);
+						}
+					};
+					//img.src = 'assets/images/lyingFaceUp.png';
+					//moderateActivity; seated; lightActivity; standing; lyingFaceDown; lyingLeftSide; lyingRightSide; lying60Deg; lying30Deg
+
+					switch (code) {
+						case '1':
+							img.src = 'assets/images/lightActivity.png';
+							break;
+						case '2':
+							img.src = 'assets/images/moderateActivity.png';
+							break;
+						case '3':
+							img.src = 'assets/images/lyingFaceUp.png';
+							break;
+						case '4':
+							img.src = 'assets/images/lyingFaceDown.png';
+							break;
+						case '5':
+							img.src = 'assets/images/lyingRightSide.png';
+							break;
+						case '6':
+							img.src = 'assets/images/seated.png';
+							break;
+						case '7':
+							img.src = 'assets/images/activityInvalid.png';
+							break;
+						default:
+							break;
+					}
+
+					pt.y += titleFontSize + titleSpacing + 2; // Line Height and spacing
+				} else {
+					ctx.fillText(title[i], pt.x, pt.y + 15); //pfan
+					pt.y += titleFontSize + titleSpacing + 2; // Line Height and spacing
+
+					if (i + 1 === title.length) {
+						pt.y += vm.titleMarginBottom - titleSpacing; // If Last, add margin, remove spacing
+					}
 				}
 			}
 		}
 	},
 
 	drawBody: function(pt, vm, ctx) {
+		pt.y = pt.y + 12;
 		var bodyFontSize = vm.bodyFontSize;
 		var bodySpacing = vm.bodySpacing;
 		var bodyAlign = vm._bodyAlign;
@@ -792,8 +870,78 @@ var exports = Element.extend({
 
 		// Before Body
 		var fillLineOfText = function(line) {
-			ctx.fillText(line, pt.x + xLinePadding, pt.y);
-			pt.y += bodyFontSize + bodySpacing;
+			ctx.font = '12px Arial';
+			ctx.translate(0.5, 0.5);
+			ctx.beginPath();
+			if (line.indexOf('$') !== -1) {
+				var arrLine = line.split('$');
+
+				if (line.indexOf('EWSSplit$#FFF') !== -1) {
+					ctx.textAlign = 'left';
+					ctx.lineWidth = 1;
+					ctx.strokeStyle = 'white';
+					ctx.moveTo(pt.x, pt.y + 2);
+					ctx.lineTo(pt.x + 250 - xLinePadding, pt.y + 2);
+
+					if (line.indexOf('EWSSplit$#FFFV') !== -1) {
+						var hs = line.split('V$');
+						ctx.moveTo(pt.x + 120, pt.y + 2);
+						ctx.lineTo(pt.x + 120, pt.y + parseInt(hs[1]));
+					}
+					ctx.stroke();
+					pt.y += 5;
+				} else if (line.indexOf('Split$#FFF') !== -1) {
+					ctx.moveTo(pt.x, pt.y + 2);
+					ctx.lineTo(pt.x + 240 - xLinePadding, pt.y + 2);
+
+					if (line.indexOf('Split$#FFFV') !== -1) {
+						ctx.moveTo(pt.x + 130, pt.y + 2);
+						ctx.lineTo(pt.x + 130, pt.y + 250);
+					}
+					ctx.lineWidth = 1;
+					ctx.strokeStyle = 'white';
+					ctx.stroke();
+					pt.y += 5;
+				} else {
+					var valArr = arrLine[0].split(':');
+					pt.y += 4;
+					ctx.fillStyle = 'white';
+					if (arrLine[0].indexOf('indentEws-') !== -1) {
+						pt.x = pt.x - 0.5;
+						pt.y -= 2;
+						ctx.textAlign = 'left';
+						ctx.fillStyle = arrLine[1];
+						if (arrLine[0].indexOf('0indentEws-') !== -1) {
+							ctx.fillText(valArr[0].replace('0indentEws-', ''), pt.x + 3, pt.y);
+							ctx.fillText(valArr[1], pt.x + 90, pt.y);
+						}
+						if (arrLine[0].indexOf('1indentEws-') !== -1) {
+							pt.y -= bodyFontSize + bodySpacing;
+							ctx.fillText(valArr[0].replace('1indentEws-', ''), pt.x + 135, pt.y);
+							ctx.fillText(valArr[1], pt.x + 225, pt.y);
+						}
+					} else if (arrLine[0].indexOf('indent-') !== -1) {
+						ctx.fillStyle = arrLine[1];
+						ctx.fillText(valArr[0].replace('indent-', ''), pt.x + 30, pt.y);
+						ctx.fillStyle = arrLine[1];
+						ctx.fillText(valArr[1], pt.x + 160, pt.y);
+					} else if (arrLine[0].indexOf('ews-') !== -1) {
+						ctx.fillStyle = arrLine[1];
+						ctx.fillText(valArr[0].replace('ews-', ''), pt.x, pt.y);
+						ctx.fillStyle = arrLine[1];
+						ctx.fillText(valArr[1], pt.x + 160, pt.y);
+					} else {
+						ctx.fillStyle = arrLine[1];
+						ctx.fillText(valArr[0], pt.x, pt.y - 2);
+						ctx.fillStyle = arrLine[1];
+						ctx.fillText(valArr[1], pt.x + 160, pt.y - 2);
+					}
+					pt.y += bodyFontSize + bodySpacing;
+				}
+			} else {
+				ctx.fillText(line, pt.x + xLinePadding, pt.y);
+				pt.y += bodyFontSize + bodySpacing;
+			}
 		};
 
 		// Before body lines
@@ -874,6 +1022,11 @@ var exports = Element.extend({
 		var height = tooltipSize.height;
 		var radius = vm.cornerRadius;
 
+		if (vm.body[0].lines.length > 14) {
+			// height += (vm.body[0].lines.length - 16) * 15;
+			height += vm.body[0].lines.length * 3;
+		}
+
 		ctx.beginPath();
 		ctx.moveTo(x + radius, y);
 		if (yAlign === 'top') {
@@ -914,8 +1067,8 @@ var exports = Element.extend({
 		}
 
 		var tooltipSize = {
-			width: vm.width,
-			height: vm.height
+			width: vm.width + 40,
+			height: vm.height + 20
 		};
 		var pt = {
 			x: vm.x,
